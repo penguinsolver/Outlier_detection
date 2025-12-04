@@ -374,25 +374,41 @@ def train_mode(cfg: UserConfig) -> None:
         cv_eff = _effective_cv(y_train, int(ADV["calibration_cv"]))
         cal = _make_calibrator(base_pipeline, method=ADV["calibration_method"], cv=cv_eff)
         cal.fit(X_train, y_train)
-        proba = cal.predict_proba(X_test)[:, 1]
 
-        # Choose and save "best threshold" (F1) for later scoring
-        best = _best_threshold_by_f1(y_test, proba, step=float(ADV["threshold_grid_step"]))
+        proba_train = cal.predict_proba(X_train)[:, 1]
+        proba_test = cal.predict_proba(X_test)[:, 1]
+
+        # Choose and save "best threshold" (F1) for later scoring using held-out test set
+        best = _best_threshold_by_f1(y_test, proba_test, step=float(ADV["threshold_grid_step"]))
         thr = best["threshold"]
-        y_pred = (proba >= thr).astype(int)
+        y_pred_test = (proba_test >= thr).astype(int)
+        y_pred_train = (proba_train >= thr).astype(int)
 
-        # Metrics at saved threshold
-        tn, fp, fn, tp = confusion_matrix(y_test, y_pred, labels=[0, 1]).ravel()
-        prec = precision_score(y_test, y_pred, zero_division=0)
-        rec = recall_score(y_test, y_pred, zero_division=0)
-        f1 = f1_score(y_test, y_pred, zero_division=0)
-        fbeta = fbeta_score(y_test, y_pred, beta=float(ADV["fbeta_beta"]), zero_division=0)
+        # Metrics at saved threshold (test)
+        tn, fp, fn, tp = confusion_matrix(y_test, y_pred_test, labels=[0, 1]).ravel()
+        prec = precision_score(y_test, y_pred_test, zero_division=0)
+        rec = recall_score(y_test, y_pred_test, zero_division=0)
+        f1 = f1_score(y_test, y_pred_test, zero_division=0)
+        fbeta = fbeta_score(y_test, y_pred_test, beta=float(ADV["fbeta_beta"]), zero_division=0)
 
-        ap = average_precision_score(y_test, proba) if len(np.unique(y_test)) > 1 else float("nan")
-        roc = _roc_auc_safe(y_test, proba)
-        brier = brier_score_loss(y_test, proba) if len(np.unique(y_test)) > 1 else float("nan")
-        ll = _log_loss_safe(y_test, proba) if len(np.unique(y_test)) > 1 else float("nan")
-        p_at_k = _precision_at_k(y_test, proba, int(ADV["precision_at_k"]))
+        ap = average_precision_score(y_test, proba_test) if len(np.unique(y_test)) > 1 else float("nan")
+        roc = _roc_auc_safe(y_test, proba_test)
+        brier = brier_score_loss(y_test, proba_test) if len(np.unique(y_test)) > 1 else float("nan")
+        ll = _log_loss_safe(y_test, proba_test) if len(np.unique(y_test)) > 1 else float("nan")
+        p_at_k = _precision_at_k(y_test, proba_test, int(ADV["precision_at_k"]))
+
+        # Metrics at saved threshold (train, for reference)
+        tn_tr, fp_tr, fn_tr, tp_tr = confusion_matrix(y_train, y_pred_train, labels=[0, 1]).ravel()
+        prec_tr = precision_score(y_train, y_pred_train, zero_division=0)
+        rec_tr = recall_score(y_train, y_pred_train, zero_division=0)
+        f1_tr = f1_score(y_train, y_pred_train, zero_division=0)
+        fbeta_tr = fbeta_score(y_train, y_pred_train, beta=float(ADV["fbeta_beta"]), zero_division=0)
+
+        ap_tr = average_precision_score(y_train, proba_train) if len(np.unique(y_train)) > 1 else float("nan")
+        roc_tr = _roc_auc_safe(y_train, proba_train)
+        brier_tr = brier_score_loss(y_train, proba_train) if len(np.unique(y_train)) > 1 else float("nan")
+        ll_tr = _log_loss_safe(y_train, proba_train) if len(np.unique(y_train)) > 1 else float("nan")
+        p_at_k_tr = _precision_at_k(y_train, proba_train, int(ADV["precision_at_k"]))
 
         runtime_s = time.perf_counter() - t0
 
@@ -409,6 +425,17 @@ def train_mode(cfg: UserConfig) -> None:
             "brier": float(brier),
             "log_loss": float(ll),
             f"precision@{int(ADV['precision_at_k'])}": float(p_at_k),
+            "train_tp": int(tp_tr), "train_fp": int(fp_tr), "train_tn": int(tn_tr), "train_fn": int(fn_tr),
+            "train_precision": float(prec_tr),
+            "train_recall": float(rec_tr),
+            "train_f1": float(f1_tr),
+            f"train_f{ADV['fbeta_beta']:g}": float(fbeta_tr),
+            "train_avg_precision(PR-AUC)": float(ap_tr),
+            "train_roc_auc": float(roc_tr),
+            "train_brier": float(brier_tr),
+            "train_log_loss": float(ll_tr),
+            f"train_precision@{int(ADV['precision_at_k'])}": float(p_at_k_tr),
+            "train_outlier_rate": float(np.mean(y_train)),
             "test_outlier_rate": float(np.mean(y_test)),
             "runtime_seconds": float(runtime_s),
             "calibration": f"{ADV['calibration_method']} (cv={cv_eff})",
@@ -419,9 +446,9 @@ def train_mode(cfg: UserConfig) -> None:
             "model": name,
             "row_index_in_input": test_idx,
             "y_true": y_test,
-            "p_outlier_calibrated": proba,
+            "p_outlier_calibrated": proba_test,
             "threshold_used": float(thr),
-            "y_pred": y_pred,
+            "y_pred": y_pred_test,
         })
         if cfg.id_col:
             pred_out[cfg.id_col] = df.iloc[test_idx][cfg.id_col].to_numpy()
