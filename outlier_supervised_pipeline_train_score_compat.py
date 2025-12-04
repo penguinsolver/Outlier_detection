@@ -68,7 +68,7 @@ class UserConfig:
     input_path: str = "dummy_outliers.csv"         # training file (labels required) OR weekly scoring file (no labels needed)
     output_excel: str = "outlier_results.xlsx"
 
-    mode: str = "score"                            # "train" or "score"
+    mode: str = "train"                            # "train" or "score"
     artifacts_dir: str = "model_artifacts"         # where trained models + thresholds are saved/loaded
 
     target_col: str = "is_outlier"                 # only used in TRAIN mode (must be 0/1, 1 = outlier)
