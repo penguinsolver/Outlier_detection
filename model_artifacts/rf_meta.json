@@ -1,0 +1,20 @@
+{
+  "model": "rf",
+  "saved_threshold": 0.06,
+  "feature_columns": [
+    "event_date",
+    "amount",
+    "count_7d",
+    "time_since_last_min",
+    "link_count",
+    "delta_amount_24h",
+    "channel",
+    "country",
+    "device"
+  ],
+  "id_col": "record_id",
+  "target_col": "is_outlier",
+  "calibration": "sigmoid (cv=5)",
+  "trained_rows": 160,
+  "test_rows": 40
+}
