@@ -1,0 +1,29 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# IDE/project files
+.vscode/
+.idea/
+
+# Packaging/build
+*.egg-info/
+build/
+dist/
+
+# Model artifacts & outputs
+model_artifacts/
+*.joblib
+outlier_results*.xlsx
+scored*.xlsx
+
+# Logs
+*.log
